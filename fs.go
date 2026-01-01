@@ -101,16 +101,13 @@ func traverseFs(root string, depth int) []*FileEntry {
 				fmt.Println("Error getting directory size:", err)
 				return fs.SkipDir
 			}
+			entry.Name += "/"
 			entry.Size = size
 			entries = append(entries, entry)
-
-			// Stop WalkDir from going into this folder because we
-			// already calculated its size!
-			return fs.SkipDir
 		} else {
 			info, err := d.Info()
 			if err != nil {
-				return nil // Skip this specific file if info fails
+				return nil
 			}
 			entry.Size = info.Size()
 			entries = append(entries, entry)
