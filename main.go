@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	root := "/home/ukiran/Videos/Tuts"
+	root := "/home/ukiran/Git"
 	depth := 1
 
 	table := &Table{}

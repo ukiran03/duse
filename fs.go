@@ -11,60 +11,6 @@ import (
 	"sync/atomic"
 )
 
-func splitPath(p string) []string {
-	p = filepath.Clean(p)
-	if p == "." || p == "/" {
-		return nil
-	}
-	var parts []string
-	for {
-		dir, file := filepath.Split(p)
-		if file != "" {
-			parts = append(parts, file) // O(1) average case
-		}
-		// Stop if we reached the root or the end of a relative path
-		if dir == p || dir == "" || dir == "." || dir == "/" {
-			break
-		}
-		p = filepath.Clean(dir)
-	}
-	return parts
-}
-
-func ConcurrnetDirSize(path string) (int64, error) {
-	var total atomic.Int64
-	var wg sync.WaitGroup
-	sema := make(chan struct{}, 2*runtime.NumCPU())
-
-	var walker func(string)
-	walker = func(p string) {
-		sema <- struct{}{}
-		entries, err := os.ReadDir(p)
-		<-sema
-		if err != nil {
-			log.Printf("Error reading %s: %v\n", p, err)
-			return
-		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				wg.Go(func() {
-					walker(filepath.Join(p, entry.Name()))
-				})
-			} else {
-				info, err := entry.Info()
-				if err == nil {
-					total.Add(info.Size())
-				}
-			}
-		}
-	}
-	wg.Go(func() {
-		walker(path)
-	})
-	wg.Wait()
-	return total.Load(), nil
-}
-
 type FileEntry struct {
 	Name  string
 	Size  int64
@@ -119,4 +65,58 @@ func traverseFs(root string, depth int) []*FileEntry {
 		fmt.Println("traverseFs error:", err)
 	}
 	return entries
+}
+
+func ConcurrnetDirSize(path string) (int64, error) {
+	var total atomic.Int64
+	var wg sync.WaitGroup
+	sema := make(chan struct{}, 2*runtime.NumCPU())
+
+	var walker func(string)
+	walker = func(p string) {
+		sema <- struct{}{}
+		entries, err := os.ReadDir(p)
+		<-sema
+		if err != nil {
+			log.Printf("Error reading %s: %v\n", p, err)
+			return
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				wg.Go(func() {
+					walker(filepath.Join(p, entry.Name()))
+				})
+			} else {
+				info, err := entry.Info()
+				if err == nil {
+					total.Add(info.Size())
+				}
+			}
+		}
+	}
+	wg.Go(func() {
+		walker(path)
+	})
+	wg.Wait()
+	return total.Load(), nil
+}
+
+func splitPath(p string) []string {
+	p = filepath.Clean(p)
+	if p == "." || p == "/" {
+		return nil
+	}
+	var parts []string
+	for {
+		dir, file := filepath.Split(p)
+		if file != "" {
+			parts = append(parts, file) // O(1) average case
+		}
+		// Stop if we reached the root or the end of a relative path
+		if dir == p || dir == "" || dir == "." || dir == "/" {
+			break
+		}
+		p = filepath.Clean(dir)
+	}
+	return parts
 }
