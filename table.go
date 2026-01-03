@@ -7,10 +7,11 @@ import (
 )
 
 type Row struct {
-	size    int64
-	name    string
-	isDir   bool
-	barsize int
+	size      int64
+	name      string
+	isDir     bool
+	barlength int
+	color     int
 }
 
 type Table struct {
@@ -18,40 +19,31 @@ type Table struct {
 	largest int
 }
 
-func tabulate(ents []*FileEntry) *Table {
-	n := len(ents)
-	if n == 0 {
+func makeTable(entries []*FileEntry) *Table {
+	if len(entries) == 0 {
 		return &Table{}
 	}
-	rows := make([]*Row, n)
-	largest := 0
-	for i, ent := range ents {
-		if ent.Size > ents[largest].Size {
-			largest = i
-		}
+	rows := make([]*Row, len(entries))
+	var maxEntry *FileEntry
+	maxIdx := 0
+	for i, ent := range entries {
 		rows[i] = &Row{
 			name:  ent.Name,
 			size:  ent.Size,
 			isDir: ent.IsDir,
 		}
+		if maxEntry == nil || ent.Size > maxEntry.Size {
+			maxEntry = ent
+			maxIdx = i
+		}
 	}
-	return &Table{rows, largest}
-}
-
-func writeBar(t *Table, barLength int64) *Table {
-	if len(t.rows) == 0 {
-		return t
+	maxSize := maxEntry.Size
+	for _, r := range rows {
+		ratio := calcRatio(r.size, maxSize)
+		r.barlength = calcBarsize(ratio)
+		r.color = calcColor(ratio)
 	}
-	largest := t.rows[t.largest].size
-	if largest == 0 {
-		fmt.Println("Warning: Largest size is zero, skipping bar calculation.")
-		return t
-	}
-	for _, r := range t.rows {
-		cols := (barLength * r.size) / largest
-		r.barsize = int(cols)
-	}
-	return t
+	return &Table{rows, maxIdx}
 }
 
 func (t *Table) Print(out io.Writer) {
@@ -79,37 +71,36 @@ func (t *Table) SummariseInPlace() {
 	if len(t.rows) == 0 {
 		return
 	}
-	var sumSize int64
-	var sumBar int
+	var summSize int64
 	var hasFiles bool
+	keeping := t.rows[:0]
 
-	// writeIdx keeps track of where to put the next directory
-	writeIdx := 0
-	for i := 0; i < len(t.rows); i++ {
-		if t.rows[i].isDir {
-			// Move directory to the "keep" section
-			t.rows[writeIdx] = t.rows[i]
-			writeIdx++
+	for _, row := range t.rows {
+		if row.isDir {
+			keeping = append(keeping, row)
 		} else {
-			sumSize += t.rows[i].size
-			sumBar += t.rows[i].barsize
+			summSize += row.size
 			hasFiles = true
 		}
 	}
 	if hasFiles {
-		summaryRow := &Row{sumSize, ".", false, sumBar}
-		// If there's space in the original capacity, we append/assign
-		if writeIdx < len(t.rows) {
-			t.rows[writeIdx] = summaryRow
-			writeIdx++
-		} else {
-			t.rows = append(t.rows, summaryRow)
+		keeping = append(keeping, &Row{size: summSize, name: ".", isDir: false})
+	}
+	clear(t.rows[len(keeping):])
+	t.rows = keeping
+
+	var maxSize int64
+	maxIdx := -1
+	for i, row := range t.rows {
+		if row.size >= maxSize {
+			maxSize = row.size
+			maxIdx = i
 		}
 	}
-
-	// Empty remaining: nil out, resilce
-	for i := writeIdx; i < len(t.rows); i++ {
-		t.rows[i] = nil
+	for _, r := range t.rows {
+		ratio := calcRatio(r.size, maxSize)
+		r.barlength = calcBarsize(ratio)
+		r.color = calcColor(ratio)
 	}
-	t.rows = t.rows[:writeIdx]
+	t.largest = maxIdx
 }

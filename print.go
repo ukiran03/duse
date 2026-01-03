@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const barLength = 20
+const BarLength = 20
 
 func humanSize(size int64) string {
 	switch {
@@ -25,14 +25,18 @@ func drawBar(ratio float32) string {
 	charBlock := "▇"
 	startC := colors[calcColor(ratio)]
 	endC := colors[Reset]
-	length := barLength - int(barLength*ratio)
+	length := BarLength - int(BarLength*ratio)
 	solidBar := strings.Repeat(charBlock, length)
 
-	if length < barLength {
-		blankBar := strings.Repeat(blankBlock, barLength-length)
+	if length < BarLength {
+		blankBar := strings.Repeat(blankBlock, BarLength-length)
 		return fmt.Sprintf("%s%s%s", startC, blankBar+solidBar, endC)
 	}
 	return fmt.Sprintf("%s%s%s", startC, solidBar, endC)
+}
+
+func calcBarsize(ratio float32) int {
+	return BarLength - int(BarLength*ratio)
 }
 
 func calcColor(ratio float32) int {
@@ -42,4 +46,20 @@ func calcColor(ratio float32) int {
 
 func calcRatio(size, max int64) float32 {
 	return 1.0 - (float32(size) / float32(max))
+}
+
+func writeBar(t *Table, barLength int64) *Table {
+	if len(t.rows) == 0 {
+		return t
+	}
+	largest := t.rows[t.largest].size
+	if largest == 0 {
+		fmt.Println("Warning: Largest size is zero, skipping bar calculation.")
+		return t
+	}
+	for _, r := range t.rows {
+		cols := (BarLength * r.size) / largest
+		r.barlength = int(cols)
+	}
+	return t
 }

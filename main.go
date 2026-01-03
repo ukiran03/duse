@@ -9,6 +9,6 @@ func main() {
 	depth := 1
 
 	table := &Table{}
-	table = writeBar(tabulate(traverseFs(root, depth)), barLength)
+	table = writeBar(tabulate(traverseFs(root, depth)), BarLength)
 	table.Print(os.Stdout)
 }
