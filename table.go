@@ -141,15 +141,17 @@ func (t *Table) SortTable(order int) {
 	if t == nil || len(t.rows) < 2 {
 		return
 	}
-
-	if order > 0 {
+	switch {
+	case order == 0:
+		return
+	case order > 0:
 		slices.SortFunc(t.rows, func(a, b *Row) int {
 			if a == nil || b == nil {
 				return 0
 			}
 			return cmp.Compare(a.size, b.size)
 		})
-	} else {
+	default:
 		slices.SortFunc(t.rows, func(b, a *Row) int {
 			if a == nil || b == nil {
 				return 0
