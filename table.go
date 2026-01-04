@@ -1,8 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
-	"io"
+	"os"
+	"slices"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -14,6 +17,22 @@ type Row struct {
 	color     int
 }
 
+func (r *Row) makeBar() string {
+	blankChar := " "
+	solidChar := "▇"
+	solidBar := strings.Repeat(solidChar, r.barlength)
+	if r.barlength < BarLength {
+		blankBar := strings.Repeat(blankChar, BarLength-r.barlength)
+		return blankBar + solidBar
+	}
+	return solidBar
+}
+
+func (r *Row) humanSize() string {
+	size := r.size
+	return humanSize(size)
+}
+
 type Table struct {
 	rows    []*Row
 	largest int
@@ -23,21 +42,29 @@ func makeTable(entries []*FileEntry) *Table {
 	if len(entries) == 0 {
 		return &Table{}
 	}
-	rows := make([]*Row, len(entries))
-	var maxEntry *FileEntry
-	maxIdx := 0
-	for i, ent := range entries {
-		rows[i] = &Row{
+	dirs := make([]*Row, 0, len(entries)/2)
+	files := make([]*Row, 0, len(entries)/2)
+	for _, ent := range entries {
+		r := &Row{
 			name:  ent.Name,
 			size:  ent.Size,
 			isDir: ent.IsDir,
 		}
-		if maxEntry == nil || ent.Size > maxEntry.Size {
-			maxEntry = ent
+		if ent.IsDir {
+			dirs = append(dirs, r)
+		} else {
+			files = append(files, r)
+		}
+	}
+	rows := slices.Concat(dirs, files)
+	maxIdx := 0
+	var maxSize int64
+	for i, r := range rows {
+		if r.size > maxSize {
+			maxSize = r.size
 			maxIdx = i
 		}
 	}
-	maxSize := maxEntry.Size
 	for _, r := range rows {
 		ratio := calcRatio(r.size, maxSize)
 		r.barlength = calcBarsize(ratio)
@@ -46,28 +73,33 @@ func makeTable(entries []*FileEntry) *Table {
 	return &Table{rows, maxIdx}
 }
 
-func (t *Table) Print(out io.Writer) {
-	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', tabwriter.AlignRight)
+func (t *Table) Total() string {
+	var total int64
 	for _, row := range t.rows {
-		ratio := calcRatio(row.size, t.rows[t.largest].size)
-		if row.isDir {
-			fmt.Fprintf(
-				w, "%s%s%s\t%s\t %s%s%s\n", colors[Blue], humanSize(row.size),
-				colors[Reset], drawBar(ratio), colors[Text], row.name, colors[Reset],
-			)
-		} else {
-			fmt.Fprintf(
-				w, "%s%s%s\t%s\t %s%s%s\n", colors[Text], humanSize(row.size),
-				colors[Reset], drawBar(ratio), colors[Text], row.name, colors[Reset],
-			)
-		}
+		total += row.size
 	}
+	return humanSize(total)
+}
+
+func (t *Table) Print() {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
+	for _, row := range t.rows {
+		fmt.Fprintf(
+			w, "%s%s\t%s\t %s%s\n", colors[row.color], row.humanSize(),
+			row.makeBar(), row.name, colors[Reset],
+		)
+	}
+	fmt.Fprintf(
+		w, "%s%s\t \t %s%s\n", colors[BoldText], t.Total(), "Total", colors[Reset],
+	)
 	w.Flush()
 }
 
 // Summarise merges all files into a single row while keeping
 // directories separate.
-func (t *Table) SummariseInPlace() {
+// https://go.dev/wiki/SliceTricks#filtering-without-allocating
+// https://abhinavg.net/2019/07/11/zero-alloc-slice-filter/
+func (t *Table) SummariseTable() {
 	if len(t.rows) == 0 {
 		return
 	}
@@ -103,4 +135,26 @@ func (t *Table) SummariseInPlace() {
 		r.color = calcColor(ratio)
 	}
 	t.largest = maxIdx
+}
+
+func (t *Table) SortTable(order int) {
+	if t == nil || len(t.rows) < 2 {
+		return
+	}
+
+	if order > 0 {
+		slices.SortFunc(t.rows, func(a, b *Row) int {
+			if a == nil || b == nil {
+				return 0
+			}
+			return cmp.Compare(a.size, b.size)
+		})
+	} else {
+		slices.SortFunc(t.rows, func(b, a *Row) int {
+			if a == nil || b == nil {
+				return 0
+			}
+			return cmp.Compare(a.size, b.size)
+		})
+	}
 }

@@ -1,14 +1,11 @@
 package main
 
-import (
-	"os"
-)
-
 func main() {
-	root := "/home/ukiran/Git"
+	root := "/home/ukiran/Videos" // test
 	depth := 1
 
-	table := &Table{}
-	table = writeBar(tabulate(traverseFs(root, depth)), BarLength)
-	table.Print(os.Stdout)
+	table := makeTable(traverseFs(root, depth))
+	// table.SortTable(-1)
+	table.SummariseTable()
+	table.Print()
 }
