@@ -18,11 +18,9 @@ type Row struct {
 }
 
 func (r *Row) makeBar() string {
-	blankChar := " "
-	solidChar := "▇"
-	solidBar := strings.Repeat(solidChar, r.barlength)
+	solidBar := strings.Repeat(SolidChar, r.barlength)
 	if r.barlength < BarLength {
-		blankBar := strings.Repeat(blankChar, BarLength-r.barlength)
+		blankBar := strings.Repeat(BlankChar, BarLength-r.barlength)
 		return blankBar + solidBar
 	}
 	return solidBar
@@ -142,8 +140,6 @@ func (t *Table) SortTable(order int) {
 		return
 	}
 	switch {
-	case order == 0:
-		return
 	case order > 0:
 		slices.SortFunc(t.rows, func(a, b *Row) int {
 			if a == nil || b == nil {
@@ -151,12 +147,14 @@ func (t *Table) SortTable(order int) {
 			}
 			return cmp.Compare(a.size, b.size)
 		})
-	default:
+	case order < 0:
 		slices.SortFunc(t.rows, func(b, a *Row) int {
 			if a == nil || b == nil {
 				return 0
 			}
 			return cmp.Compare(a.size, b.size)
 		})
+	default:
+		return
 	}
 }

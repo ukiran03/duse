@@ -1,6 +1,10 @@
 package main
 
-const BarLength = 20
+const (
+	BarLength = 20
+	BlankChar = " "
+	SolidChar = "▇"
+)
 
 const (
 	KB = 1024

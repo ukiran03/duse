@@ -1,12 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -25,11 +26,14 @@ func traverseFs(root string, depth int) []*FileEntry {
 			fmt.Fprintf(os.Stderr, "Error accessing: %v [%v]\n", path, err)
 			return fs.SkipDir
 		}
+
+		// Avoid processing the root itself
 		if path == root {
 			return nil
 		}
+
 		relPath, _ := filepath.Rel(root, path)
-		relDepth := len(splitPath(relPath))
+		relDepth := splitPathLength(relPath)
 
 		if relDepth > depth {
 			if d.IsDir() {
@@ -38,36 +42,37 @@ func traverseFs(root string, depth int) []*FileEntry {
 			return nil
 		}
 
-		entry := &FileEntry{}
-		entry.Name = d.Name()
-		entry.IsDir = d.IsDir()
+		entry := &FileEntry{
+			// shows depth significance
+			Name:  filepath.ToSlash(relPath),
+			IsDir: d.IsDir(),
+		}
+
 		if d.IsDir() {
-			size, err := ConcurrnetDirSize(path)
+			size, err := concurrnetDirSize(path)
 			if err != nil {
 				fmt.Println("Error getting directory size:", err)
 				return fs.SkipDir
 			}
 			entry.Name += "/"
 			entry.Size = size
-			entries = append(entries, entry)
 		} else {
 			info, err := d.Info()
 			if err != nil {
 				return nil
 			}
 			entry.Size = info.Size()
-			entries = append(entries, entry)
 		}
-
+		entries = append(entries, entry)
 		return nil
 	})
 	if err != nil {
-		fmt.Println("traverseFs error:", err)
+		fmt.Printf("Walk finished with error: %v\n", err)
 	}
 	return entries
 }
 
-func ConcurrnetDirSize(path string) (int64, error) {
+func concurrnetDirSize(path string) (int64, error) {
 	var total atomic.Int64
 	var wg sync.WaitGroup
 	sema := make(chan struct{}, 2*runtime.NumCPU())
@@ -77,10 +82,16 @@ func ConcurrnetDirSize(path string) (int64, error) {
 		sema <- struct{}{}
 		entries, err := os.ReadDir(p)
 		<-sema
+
 		if err != nil {
-			log.Printf("Error reading %s: %v\n", p, err)
+			if errors.Is(err, fs.ErrPermission) {
+				fmt.Fprintf(os.Stderr, "Permission denied, skipping [%v]\n", p)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", p, err)
+			}
 			return
 		}
+
 		for _, entry := range entries {
 			if entry.IsDir() {
 				wg.Go(func() {
@@ -101,22 +112,10 @@ func ConcurrnetDirSize(path string) (int64, error) {
 	return total.Load(), nil
 }
 
-func splitPath(p string) []string {
+func splitPathLength(p string) int {
 	p = filepath.Clean(p)
-	if p == "." || p == "/" {
-		return nil
+	if p == "." || p == "/" || p == "" {
+		return 0
 	}
-	var parts []string
-	for {
-		dir, file := filepath.Split(p)
-		if file != "" {
-			parts = append(parts, file) // O(1) average case
-		}
-		// Stop if we reached the root or the end of a relative path
-		if dir == p || dir == "" || dir == "." || dir == "/" {
-			break
-		}
-		p = filepath.Clean(dir)
-	}
-	return parts
+	return len(strings.Split(p, string(os.PathSeparator)))
 }
