@@ -26,12 +26,10 @@ func traverseFs(root string, depth int) []*FileEntry {
 			fmt.Fprintf(os.Stderr, "Error accessing: %v [%v]\n", path, err)
 			return fs.SkipDir
 		}
-
 		// Avoid processing the root itself
 		if path == root {
 			return nil
 		}
-
 		relPath, _ := filepath.Rel(root, path)
 		relDepth := splitPathLength(relPath)
 
@@ -47,7 +45,6 @@ func traverseFs(root string, depth int) []*FileEntry {
 			Name:  filepath.ToSlash(relPath),
 			IsDir: d.IsDir(),
 		}
-
 		if d.IsDir() {
 			size, err := concurrnetDirSize(path)
 			if err != nil {

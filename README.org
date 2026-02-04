@@ -1,0 +1,28 @@
+** File space usage utility like du(1) with pretty colors
+
+#+begin_src sh
+$ duse -h
+Usage of duse:
+  -depth int
+    	Depth to traverse files (default 1)
+  -rsort
+    	Sort in descending order
+  -s	Summarise the individual files
+  -sort
+    	Sort in ascending order
+#+end_src
+
+#+begin_src sh
+$ duse -s -depth 1 ~/Videos
+  17.3M                    ▇ .edits/
+ 321.8M                    ▇ English/
+  37.7G            ▇▇▇▇▇▇▇▇▇ God/
+  69.8M                    ▇ Hindi/
+ 502.3M                    ▇ Interviews/
+  84.1G ▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇ Tuts/
+ 512.8M                    ▇ .
+ 123.2G                      Total
+#+end_src
+
+
+*Inspired by*: [[http://arsunik.free.fr/prog/cdu.html][cdu]]
