@@ -36,6 +36,10 @@ type Table struct {
 	largest int
 }
 
+// makeTable serializes the '[]FileEntry' data into the 'Table'
+// representation.
+//
+// Treats the dir, file types differently.
 func makeTable(entries []*FileEntry) *Table {
 	if len(entries) == 0 {
 		return &Table{}
@@ -95,6 +99,7 @@ func (t *Table) Print() {
 
 // Summarise merges all files into a single row while keeping
 // directories separate.
+// Check:
 // https://go.dev/wiki/SliceTricks#filtering-without-allocating
 // https://abhinavg.net/2019/07/11/zero-alloc-slice-filter/
 func (t *Table) SummariseTable() {
@@ -135,26 +140,23 @@ func (t *Table) SummariseTable() {
 	t.largest = maxIdx
 }
 
+// SortTable sorts the table rows based on the provided order.
+// Positive values sort ascending; negative values sort descending.
 func (t *Table) SortTable(order int) {
 	if t == nil || len(t.rows) < 2 {
 		return
 	}
 	switch {
-	case order > 0:
+	case order > 0: // Ascending
 		slices.SortFunc(t.rows, func(a, b *Row) int {
-			if a == nil || b == nil {
-				return 0
-			}
 			return cmp.Compare(a.size, b.size)
 		})
-	case order < 0:
-		slices.SortFunc(t.rows, func(b, a *Row) int {
-			if a == nil || b == nil {
-				return 0
-			}
-			return cmp.Compare(a.size, b.size)
+	case order < 0: // Descending
+		slices.SortFunc(t.rows, func(a, b *Row) int {
+			return cmp.Compare(b.size, a.size)
 		})
 	default:
+		// No sort
 		return
 	}
 }

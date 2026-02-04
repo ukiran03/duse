@@ -41,8 +41,7 @@ func traverseFs(root string, depth int) []*FileEntry {
 		}
 
 		entry := &FileEntry{
-			// shows depth significance
-			Name:  filepath.ToSlash(relPath),
+			Name:  filepath.ToSlash(relPath), // shows depth significance
 			IsDir: d.IsDir(),
 		}
 		if d.IsDir() {
@@ -69,6 +68,8 @@ func traverseFs(root string, depth int) []*FileEntry {
 	return entries
 }
 
+// concurrnetDirSize produces the size of the directory at the path by
+// recursively visiting all sub-dirs and files once (hopefully).
 func concurrnetDirSize(path string) (int64, error) {
 	var total atomic.Int64
 	var wg sync.WaitGroup
@@ -82,6 +83,7 @@ func concurrnetDirSize(path string) (int64, error) {
 
 		if err != nil {
 			if errors.Is(err, fs.ErrPermission) {
+				// NOTE: Are we really skipping
 				fmt.Fprintf(os.Stderr, "Permission denied, skipping [%v]\n", p)
 			} else {
 				fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", p, err)
@@ -109,6 +111,7 @@ func concurrnetDirSize(path string) (int64, error) {
 	return total.Load(), nil
 }
 
+// splitPathLength tells how deep are we in the path
 func splitPathLength(p string) int {
 	p = filepath.Clean(p)
 	if p == "." || p == "/" || p == "" {

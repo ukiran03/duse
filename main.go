@@ -15,7 +15,7 @@ type config struct {
 
 func main() {
 	cfg := config{}
-	flag.BoolVar(&cfg.summary, "s", false, "Summarise the individual files")
+	flag.BoolVar(&cfg.summary, "s", false, "Summarise the individual files (.)")
 	flag.IntVar(&cfg.depth, "depth", 1, "Depth to traverse files")
 	asc := flag.Bool("sort", false, "Sort in ascending order")
 	desc := flag.Bool("rsort", false, "Sort in descending order")
@@ -32,7 +32,7 @@ func main() {
 	case *desc:
 		cfg.sort = -1
 	default:
-		cfg.sort = 0 // just in case
+		cfg.sort = 0 // just in case (no sort)
 	}
 
 	if err := run(cfg); err != nil {
@@ -55,5 +55,5 @@ func run(cfg config) error {
 		table.SortTable(cfg.sort)
 		table.Print()
 	}
-	return nil // TODO: Improve error management
+	return nil // TODO: Improve error propagation
 }
