@@ -27,15 +27,15 @@ const (
 )
 
 var colors = map[int]string{
-	1: "\033[0031m",
-	2: "\033[0032m",
-	3: "\033[0033m",
-	4: "\033[0034m",
-	5: "\033[0035m",
-	6: "\033[0036m",
+	Red:     "\x1b[31m",
+	Green:   "\x1b[32m",
+	Yellow:  "\x1b[33m",
+	Blue:    "\x1b[34m",
+	Magenta: "\x1b[35m",
+	Cyan:    "\x1b[36m",
+	White:   "\x1b[37m",
 
-	7:  "\033[0037m",
-	8:  "\033[0;39m", // Normal Text
-	9:  "\033[1;39m", // Bold Text
-	10: "\033[0000m",
+	Text:     "\x1b[39m", // Default foreground color
+	BoldText: "\x1b[1m",  // Bold modifier
+	Reset:    "\x1b[0m",  // Reset all attributes
 }
