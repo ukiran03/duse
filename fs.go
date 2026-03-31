@@ -45,7 +45,7 @@ func traverseFs(root string, depth int) []*FileEntry {
 			IsDir: d.IsDir(),
 		}
 		if d.IsDir() {
-			size, err := concurrnetDirSize(path)
+			size, err := concurrentDirSize(path)
 			if err != nil {
 				fmt.Println("Error getting directory size:", err)
 				return fs.SkipDir
@@ -68,33 +68,36 @@ func traverseFs(root string, depth int) []*FileEntry {
 	return entries
 }
 
-// concurrnetDirSize produces the size of the directory at the path by
-// recursively visiting all sub-dirs and files once (hopefully).
-func concurrnetDirSize(path string) (int64, error) {
+// concurrentDirSize returns the total size of all files in the directory tree
+// rooted at path. It skips directories it cannot read (e.g., permission denied)
+// and returns the sum even if some errors occurred.
+func concurrentDirSize(path string) (int64, error) {
 	var total atomic.Int64
 	var wg sync.WaitGroup
+	// Limit concurrent directory reads (I/O bound)
 	sema := make(chan struct{}, 2*runtime.NumCPU())
 
-	var walker func(string)
-	walker = func(p string) {
-		sema <- struct{}{}
-		entries, err := os.ReadDir(p)
-		<-sema
+	var walker func(string) error
+	walker = func(p string) error {
+		sema <- struct{}{}        // acquire
+		defer func() { <-sema }() // defer release
 
+		entries, err := os.ReadDir(p)
 		if err != nil {
 			if errors.Is(err, fs.ErrPermission) {
-				// NOTE: Are we really skipping
-				fmt.Fprintf(os.Stderr, "Permission denied, skipping [%v]\n", p)
-			} else {
-				fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", p, err)
+				fmt.Fprintf(os.Stderr, "Permission denied, skipping [%s]\n", p)
+				return nil // continue with siblings
 			}
-			return
+			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", p, err)
+			return err
 		}
 
 		for _, entry := range entries {
+			fullpath := filepath.Join(p, entry.Name())
 			if entry.IsDir() {
 				wg.Go(func() {
-					walker(filepath.Join(p, entry.Name()))
+					// ignore error for now (or propagate via channel)
+					_ = walker(fullpath)
 				})
 			} else {
 				info, err := entry.Info()
@@ -103,9 +106,11 @@ func concurrnetDirSize(path string) (int64, error) {
 				}
 			}
 		}
+		return nil
 	}
+
 	wg.Go(func() {
-		walker(path)
+		_ = walker(path)
 	})
 	wg.Wait()
 	return total.Load(), nil
