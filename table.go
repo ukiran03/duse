@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"iter"
 	"os"
 	"slices"
 	"strings"
@@ -17,48 +18,51 @@ type Row struct {
 	color     int
 }
 
-func (r *Row) makeBar() string {
-	solidBar := strings.Repeat(SolidChar, r.barlength)
-	if r.barlength < BarLength {
-		blankBar := strings.Repeat(BlankChar, BarLength-r.barlength)
-		return blankBar + solidBar
-	}
-	return solidBar
-}
-
-func (r *Row) humanSize() string {
-	size := r.size
-	return humanSize(size)
-}
-
 type Table struct {
 	rows    []*Row
 	largest int
 }
 
-// makeTable serializes the '[]FileEntry' data into the 'Table'
-// representation.
-//
-// Treats the dir, file types differently.
+func (t *Table) All() iter.Seq[*Row] {
+	return func(yield func(*Row) bool) {
+		for _, row := range t.rows {
+			if !yield(row) {
+				return
+			}
+		}
+	}
+}
+
+func EntriesByType(entries []*FileEntry) iter.Seq[*Row] {
+	return func(yield func(*Row) bool) {
+		// Pass 1: Yield Directories
+		for _, ent := range entries {
+			if ent.IsDir {
+				if !yield(&Row{name: ent.Name, size: ent.Size, isDir: true}) {
+					return
+				}
+			}
+		}
+		// Pass 2: Yield Files
+		for _, ent := range entries {
+			if !ent.IsDir {
+				if !yield(&Row{name: ent.Name, size: ent.Size, isDir: false}) {
+					return
+				}
+			}
+		}
+	}
+}
+
 func makeTable(entries []*FileEntry) *Table {
 	if len(entries) == 0 {
 		return &Table{}
 	}
-	dirs := make([]*Row, 0, len(entries)/2)
-	files := make([]*Row, 0, len(entries)/2)
-	for _, ent := range entries {
-		r := &Row{
-			name:  ent.Name,
-			size:  ent.Size,
-			isDir: ent.IsDir,
-		}
-		if ent.IsDir {
-			dirs = append(dirs, r)
-		} else {
-			files = append(files, r)
-		}
-	}
-	rows := slices.Concat(dirs, files)
+
+	// Drain the iterator straight into a single rows slice
+	rows := slices.Collect(EntriesByType(entries))
+
+	// Find max and calculate bars
 	maxIdx := 0
 	var maxSize int64
 	for i, r := range rows {
@@ -75,55 +79,35 @@ func makeTable(entries []*FileEntry) *Table {
 	return &Table{rows, maxIdx}
 }
 
-func (t *Table) Total() string {
-	var total int64
-	for _, row := range t.rows {
-		total += row.size
-	}
-	return humanSize(total)
-}
-
-func (t *Table) Print() {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
-	for _, row := range t.rows {
-		fmt.Fprintf(
-			w, "%s%s\t%s\t %s%s\n", colors[row.color], row.humanSize(),
-			row.makeBar(), row.name, colors[Reset],
-		)
-	}
-	fmt.Fprintf(
-		w, "%s%s\t \t %s%s\n", colors[BoldText], t.Total(), "Total", colors[Reset],
-	)
-	w.Flush()
-}
-
-// Summarise merges all files into a single row while keeping
-// directories separate.
-// Check:
-// https://go.dev/wiki/SliceTricks#filtering-without-allocating
-// https://abhinavg.net/2019/07/11/zero-alloc-slice-filter/
 func (t *Table) SummariseTable() {
 	if len(t.rows) == 0 {
 		return
 	}
-	var summSize int64
-	var hasFiles bool
-	keeping := t.rows[:0]
 
-	for _, row := range t.rows {
-		if row.isDir {
-			keeping = append(keeping, row)
-		} else {
-			summSize += row.size
-			hasFiles = true
+	// Create an iterator that filters out files and aggregates their size
+	summarizedSeq := func(yield func(*Row) bool) {
+		var summSize int64
+		var hasFiles bool
+
+		for _, row := range t.rows {
+			if row.isDir {
+				if !yield(row) {
+					return
+				}
+			} else {
+				summSize += row.size
+				hasFiles = true
+			}
+		}
+		if hasFiles {
+			yield(&Row{size: summSize, name: ".", isDir: false})
 		}
 	}
-	if hasFiles {
-		keeping = append(keeping, &Row{size: summSize, name: ".", isDir: false})
-	}
-	clear(t.rows[len(keeping):])
-	t.rows = keeping
 
+	// Collect the iterator results back into t.rows
+	t.rows = slices.Collect(summarizedSeq)
+
+	// Recalculate max sizes and bars
 	var maxSize int64
 	maxIdx := -1
 	for i, row := range t.rows {
@@ -159,4 +143,41 @@ func (t *Table) SortTable(order int) {
 		// No sort
 		return
 	}
+}
+
+func (r *Row) makeBar() string {
+	solidBar := strings.Repeat(SolidChar, r.barlength)
+	if r.barlength < BarLength {
+		blankBar := strings.Repeat(BlankChar, BarLength-r.barlength)
+		return blankBar + solidBar
+	}
+	return solidBar
+}
+
+func (r *Row) humanSize() string {
+	size := r.size
+	return humanSize(size)
+}
+
+func (t *Table) Total() string {
+	var total int64
+	for _, row := range t.rows {
+		total += row.size
+	}
+	return humanSize(total)
+}
+
+func (t *Table) Print() {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
+
+	for row := range t.All() {
+		fmt.Fprintf(
+			w, "%s%s\t%s\t %s%s\n", colors[row.color], row.humanSize(),
+			row.makeBar(), row.name, colors[Reset],
+		)
+	}
+	fmt.Fprintf(
+		w, "%s%s\t \t %s%s\n", colors[BoldText], t.Total(), "Total", colors[Reset],
+	)
+	w.Flush()
 }
