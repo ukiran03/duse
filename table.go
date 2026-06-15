@@ -19,8 +19,7 @@ type Row struct {
 }
 
 type Table struct {
-	rows    []*Row
-	largest int
+	rows []*Row
 }
 
 func (t *Table) All() iter.Seq[*Row] {
@@ -63,12 +62,10 @@ func makeTable(entries []*FileEntry) *Table {
 	rows := slices.Collect(EntriesByType(entries))
 
 	// Find max and calculate bars
-	maxIdx := 0
 	var maxSize int64
-	for i, r := range rows {
+	for _, r := range rows {
 		if r.size > maxSize {
 			maxSize = r.size
-			maxIdx = i
 		}
 	}
 	for _, r := range rows {
@@ -76,7 +73,7 @@ func makeTable(entries []*FileEntry) *Table {
 		r.barlength = calcBarsize(ratio)
 		r.color = calcColor(ratio)
 	}
-	return &Table{rows, maxIdx}
+	return &Table{rows}
 }
 
 func (t *Table) SummariseTable() {
@@ -109,11 +106,9 @@ func (t *Table) SummariseTable() {
 
 	// Recalculate max sizes and bars
 	var maxSize int64
-	maxIdx := -1
-	for i, row := range t.rows {
+	for _, row := range t.rows {
 		if row.size >= maxSize {
 			maxSize = row.size
-			maxIdx = i
 		}
 	}
 	for _, r := range t.rows {
@@ -121,7 +116,6 @@ func (t *Table) SummariseTable() {
 		r.barlength = calcBarsize(ratio)
 		r.color = calcColor(ratio)
 	}
-	t.largest = maxIdx
 }
 
 // SortTable sorts the table rows based on the provided order.
