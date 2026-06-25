@@ -31,9 +31,7 @@ func traverseFs(root string, depth int) []*FileEntry {
 			return nil
 		}
 		relPath, _ := filepath.Rel(root, path)
-		relDepth := splitPathLength(relPath)
-
-		if relDepth > depth {
+		if getDepth(relPath) > depth {
 			if d.IsDir() {
 				return fs.SkipDir
 			}
@@ -44,6 +42,7 @@ func traverseFs(root string, depth int) []*FileEntry {
 			Name:  filepath.ToSlash(relPath), // shows depth significance
 			IsDir: d.IsDir(),
 		}
+
 		if d.IsDir() {
 			size, err := concurrentDirSize(path)
 			if err != nil {
@@ -59,6 +58,7 @@ func traverseFs(root string, depth int) []*FileEntry {
 			}
 			entry.Size = info.Size()
 		}
+
 		entries = append(entries, entry)
 		return nil
 	})
@@ -79,10 +79,10 @@ func concurrentDirSize(path string) (int64, error) {
 
 	var walker func(string) error
 	walker = func(p string) error {
-		sema <- struct{}{}        // acquire
-		defer func() { <-sema }() // defer release
+		sema <- struct{}{}            // acquire token
+		entries, err := os.ReadDir(p) // read
+		<-sema                        // release token
 
-		entries, err := os.ReadDir(p)
 		if err != nil {
 			if errors.Is(err, fs.ErrPermission) {
 				fmt.Fprintf(os.Stderr, "Permission denied, skipping [%s]\n", p)
@@ -96,7 +96,6 @@ func concurrentDirSize(path string) (int64, error) {
 			fullpath := filepath.Join(p, entry.Name())
 			if entry.IsDir() {
 				wg.Go(func() {
-					// ignore error for now (or propagate via channel)
 					_ = walker(fullpath)
 				})
 			} else {
@@ -109,18 +108,19 @@ func concurrentDirSize(path string) (int64, error) {
 		return nil
 	}
 
-	wg.Go(func() {
-		_ = walker(path)
-	})
+	// wg.Go(func() {
+	// 	_ = walker(path)
+	// })
+
+	_ = walker(path)
 	wg.Wait()
 	return total.Load(), nil
 }
 
-// splitPathLength tells how deep are we in the path
-func splitPathLength(p string) int {
-	p = filepath.Clean(p)
-	if p == "." || p == "/" || p == "" {
+func getDepth(p string) int {
+	if p == "." || p == string(os.PathSeparator) || p == "" {
 		return 0
 	}
-	return len(strings.Split(p, string(os.PathSeparator)))
+	// Direct count is faster and avoids slice allocation
+	return strings.Count(p, string(os.PathSeparator)) + 1
 }

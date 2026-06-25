@@ -171,7 +171,12 @@ func (t *Table) Print() {
 		)
 	}
 	fmt.Fprintf(
-		w, "%s%s\t \t %s%s\n", colors[BoldText], t.Total(), "Total", colors[Reset],
+		w,
+		"%s%s\t \t %s%s\n",
+		colors[BoldText],
+		t.Total(),
+		"Total",
+		colors[Reset],
 	)
 	w.Flush()
 }
