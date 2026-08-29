@@ -1,5 +1,17 @@
 ** File space usage utility like du(1) with pretty colors
 
+A disk usage analyzer that provides directory traversal, size calculation,
+sorting, and visualization with colored bar charts.
+
+* Installation
+
+#+begin_src sh
+go build -o duse
+sudo mv duse /usr/local/bin/  # Optional: add to PATH
+#+end_src
+
+* Usage
+
 #+begin_src sh
 $ duse -h
 Usage of duse:
@@ -7,13 +19,17 @@ Usage of duse:
     	Depth to traverse files (default 1)
   -rsort
     	Sort in descending order
-  -s	Summarise the individual files
+  -m	Summarise the individual files
   -sort
     	Sort in ascending order
 #+end_src
 
+* Examples
+
+** Basic usage (current directory, depth 1)
+
 #+begin_src sh
-$ duse -s -depth 1 ~/Videos
+$ duse
   17.3M                    ▇ .edits/
  321.8M                    ▇ English/
   37.7G            ▇▇▇▇▇▇▇▇▇ God/
@@ -24,5 +40,48 @@ $ duse -s -depth 1 ~/Videos
  123.2G                      Total
 #+end_src
 
+** Summarize files and show with depth 2
 
-*Inspired by*: [[http://arsunik.free.fr/prog/cdu.html][cdu]]
+#+begin_src sh
+$ duse -m -depth 2 ~/Videos
+  17.3M                    ▇ .edits/
+ 321.8M                    ▇ English/
+  37.7G            ▇▇▇▇▇▇▇▇▇ God/
+  69.8M                    ▇ Hindi/
+ 502.3M                    ▇ Interviews/
+  84.1G ▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇ Tuts/
+ 512.8M                    ▇ .
+ 123.2G                      Total
+#+end_src
+
+** Sort by size (descending)
+
+#+begin_src sh
+$ duse -rsort -depth 1 .
+  84.1G ▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇ Tuts/
+  37.7G            ▇▇▇▇▇▇▇▇▇ God/
+ 502.3M                    ▇ Interviews/
+ 321.8M                    ▇ English/
+  69.8M                    ▇ Hindi/
+  17.3M                    ▇ .edits/
+ 512.8M                    ▇ .
+ 123.2G                      Total
+#+end_src
+
+** Multiple directories
+
+#+begin_src sh
+$ duse -depth 1 ~/Videos ~/Documents
+# Will analyze both directories separately
+#+end_src
+
+* Testing
+
+Run the test suite:
+
+#+begin_src sh
+go test -v
+#+end_src
+
+* Inspired by
+[[http://arsunik.free.fr/prog/cdu.html][cdu]]
