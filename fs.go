@@ -21,47 +21,59 @@ type FileEntry struct {
 func traverseFs(root string, depth int) []*FileEntry {
 	var entries []*FileEntry
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error accessing: %v [%v]\n", path, err)
-			return fs.SkipDir
-		}
-		// Avoid processing the root itself
-		if path == root {
-			return nil
-		}
-		relPath, _ := filepath.Rel(root, path)
-		if getDepth(relPath) > depth {
-			if d.IsDir() {
+	err := filepath.WalkDir(
+		root,
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error accessing: %v [%v]\n", path, err)
 				return fs.SkipDir
 			}
-			return nil
-		}
-
-		entry := &FileEntry{
-			Name:  filepath.ToSlash(relPath), // shows depth significance
-			IsDir: d.IsDir(),
-		}
-
-		if d.IsDir() {
-			size, err := concurrentDirSize(path)
-			if err != nil {
-				fmt.Println("Error getting directory size:", err)
-				return fs.SkipDir
-			}
-			entry.Name += "/"
-			entry.Size = size
-		} else {
-			info, err := d.Info()
-			if err != nil {
+			// Avoid processing the root itself
+			if path == root {
 				return nil
 			}
-			entry.Size = info.Size()
-		}
+			relPath, err := filepath.Rel(root, path)
+			if err != nil {
+				fmt.Fprintf(
+					os.Stderr,
+					"Error getting relative path: %v [%v]\n",
+					path,
+					err,
+				)
+				return nil
+			}
+			if getDepth(relPath) > depth {
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
 
-		entries = append(entries, entry)
-		return nil
-	})
+			entry := &FileEntry{
+				Name:  filepath.ToSlash(relPath), // shows depth significance
+				IsDir: d.IsDir(),
+			}
+
+			if d.IsDir() {
+				size, err := concurrentDirSize(path)
+				if err != nil {
+					fmt.Println("Error getting directory size:", err)
+					return fs.SkipDir
+				}
+				entry.Name += "/"
+				entry.Size = size
+			} else {
+				info, err := d.Info()
+				if err != nil {
+					return nil
+				}
+				entry.Size = info.Size()
+			}
+
+			entries = append(entries, entry)
+			return nil
+		},
+	)
 	if err != nil {
 		fmt.Printf("Walk finished with error: %v\n", err)
 	}
@@ -107,10 +119,6 @@ func concurrentDirSize(path string) (int64, error) {
 		}
 		return nil
 	}
-
-	// wg.Go(func() {
-	// 	_ = walker(path)
-	// })
 
 	_ = walker(path)
 	wg.Wait()
