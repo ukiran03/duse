@@ -61,19 +61,9 @@ func makeTable(entries []*FileEntry) *Table {
 	// Drain the iterator straight into a single rows slice
 	rows := slices.Collect(EntriesByType(entries))
 
-	// Find max and calculate bars
-	var maxSize int64
-	for _, r := range rows {
-		if r.size > maxSize {
-			maxSize = r.size
-		}
-	}
-	for _, r := range rows {
-		ratio := calcRatio(r.size, maxSize)
-		r.barlength = calcBarsize(ratio)
-		r.color = calcColor(ratio)
-	}
-	return &Table{rows}
+	table := &Table{rows}
+	table.recalculateBars()
+	return table
 }
 
 func (t *Table) SummariseTable() {
@@ -105,12 +95,24 @@ func (t *Table) SummariseTable() {
 	t.rows = slices.Collect(summarizedSeq)
 
 	// Recalculate max sizes and bars
+	t.recalculateBars()
+}
+
+// recalculateBars recalculates bar lengths and colors based on current row sizes.
+func (t *Table) recalculateBars() {
+	if len(t.rows) == 0 {
+		return
+	}
+
+	// Find max size
 	var maxSize int64
 	for _, row := range t.rows {
-		if row.size >= maxSize {
+		if row.size > maxSize {
 			maxSize = row.size
 		}
 	}
+
+	// Calculate bars and colors
 	for _, r := range t.rows {
 		ratio := calcRatio(r.size, maxSize)
 		r.barlength = calcBarsize(ratio)

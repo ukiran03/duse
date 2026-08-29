@@ -23,8 +23,8 @@ func calcBarsize(ratio float32) int {
 	return BarLength - int(float32(BarLength)*ratio)
 }
 
-// Maps a ratio (0.0–1.0) to a color index (1–6) (Red to Cyan).
-// Returns an integer from 1 to 6, ordered from highest to lowest.
+// Maps a ratio (0.0–1.0) to a color index (1–7) (Red to White).
+// Returns an integer from 1 to 7, ordered from highest to lowest.
 func calcColor(ratio float32) int {
 	color := int(ratio*6 + 1.01)
 	return color
